@@ -10,6 +10,8 @@ from django.middleware.csrf import _sanitize_token, constant_time_compare
 from django.utils.http import same_origin
 from django.utils.translation import ugettext as _
 from tastypie.http import HttpUnauthorized
+from tastypie.utils import get_user_model
+
 
 try:
     from hashlib import sha1
@@ -148,7 +150,8 @@ class BasicAuthentication(Authentication):
 
 class ApiKeyAuthentication(Authentication):
     """
-    Handles API key auth, in which a user provides a username & API key.
+    Handles API key auth, in which a user provides a unique identifier
+    & API key.
 
     Uses the ``ApiKey`` model that ships with tastypie. If you wish to use
     a different model, override the ``get_key`` method to perform the key check
@@ -158,18 +161,20 @@ class ApiKeyAuthentication(Authentication):
         return HttpUnauthorized()
 
     def extract_credentials(self, request):
+        user_class = get_user_model()
+
         if request.META.get('HTTP_AUTHORIZATION') and request.META['HTTP_AUTHORIZATION'].lower().startswith('apikey '):
             (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split()
 
             if auth_type.lower() != 'apikey':
                 raise ValueError("Incorrect authorization header.")
 
-            username, api_key = data.split(':', 1)
+            unique_field, api_key = data.split(':', 1)
         else:
-            username = request.GET.get('username') or request.POST.get('username')
+            unique_field = request.GET.get(user_class.USERNAME_FIELD) or request.POST.get(user_class.USERNAME_FIELD)
             api_key = request.GET.get('api_key') or request.POST.get('api_key')
 
-        return username, api_key
+        return unique_field, api_key
 
     def is_authenticated(self, request, **kwargs):
         """
@@ -178,19 +183,18 @@ class ApiKeyAuthentication(Authentication):
         Should return either ``True`` if allowed, ``False`` if not or an
         ``HttpResponse`` if you need something custom.
         """
-        from django.contrib.auth.models import User
-
+        user_class = get_user_model()
         try:
-            username, api_key = self.extract_credentials(request)
+            unique_field, api_key = self.extract_credentials(request)
         except ValueError:
             return self._unauthorized()
 
-        if not username or not api_key:
+        if not unique_field or not api_key:
             return self._unauthorized()
 
         try:
-            user = User.objects.get(username=username)
-        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            user = user_class.objects.get(**{user_class.USERNAME_FIELD: unique_field})
+        except (user_class.DoesNotExist, user_class.MultipleObjectsReturned):
             return self._unauthorized()
 
         if not self.check_active(user):
