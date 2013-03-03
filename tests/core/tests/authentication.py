@@ -9,7 +9,7 @@ from django.test import TestCase
 from tastypie.authentication import Authentication, BasicAuthentication, ApiKeyAuthentication, SessionAuthentication, DigestAuthentication, OAuthAuthentication, MultiAuthentication
 from tastypie.http import HttpUnauthorized
 from tastypie.models import ApiKey, create_api_key
-
+from tastypie.utils import get_user_model
 
 # Be tricky.
 from tastypie.authentication import python_digest, oauth2, oauth_provider
@@ -133,49 +133,51 @@ class BasicAuthenticationTestCase(TestCase):
 
 
 class ApiKeyAuthenticationTestCase(TestCase):
-    fixtures = ['note_testdata.json']
+    fixtures = ['note_testdata_auth_app.json']
 
     def setUp(self):
         super(ApiKeyAuthenticationTestCase, self).setUp()
         ApiKey.objects.all().delete()
 
     def test_is_authenticated_get_params(self):
+        user_class = get_user_model()
         auth = ApiKeyAuthentication()
         request = HttpRequest()
 
         # Simulate sending the signal.
-        john_doe = User.objects.get(username='johndoe')
+        john_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'johndoe'})
         create_api_key(User, instance=john_doe, created=True)
 
         # No username/api_key details should fail.
         self.assertEqual(isinstance(auth.is_authenticated(request), HttpUnauthorized), True)
 
         # Wrong username details.
-        request.GET['username'] = 'foo'
+        request.GET[user_class.USERNAME_FIELD] = 'foo'
         self.assertEqual(isinstance(auth.is_authenticated(request), HttpUnauthorized), True)
 
         # No api_key.
-        request.GET['username'] = 'daniel'
+        request.GET[user_class.USERNAME_FIELD] = 'daniel'
         self.assertEqual(isinstance(auth.is_authenticated(request), HttpUnauthorized), True)
 
         # Wrong user/api_key.
-        request.GET['username'] = 'daniel'
+        request.GET[user_class.USERNAME_FIELD] = 'daniel'
         request.GET['api_key'] = 'foo'
         self.assertEqual(isinstance(auth.is_authenticated(request), HttpUnauthorized), True)
 
         # Correct user/api_key.
-        john_doe = User.objects.get(username='johndoe')
-        request.GET['username'] = 'johndoe'
+        john_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'johndoe'})
+        request.GET[user_class.USERNAME_FIELD] = 'johndoe'
         request.GET['api_key'] = john_doe.api_key.key
         self.assertEqual(auth.is_authenticated(request), True)
         self.assertEqual(auth.get_identifier(request), 'johndoe')
 
     def test_is_authenticated_header(self):
+        user_class = get_user_model()
         auth = ApiKeyAuthentication()
         request = HttpRequest()
 
         # Simulate sending the signal.
-        john_doe = User.objects.get(username='johndoe')
+        john_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'johndoe'})
         create_api_key(User, instance=john_doe, created=True)
 
         # No username/api_key details should fail.
@@ -194,29 +196,31 @@ class ApiKeyAuthenticationTestCase(TestCase):
         self.assertEqual(isinstance(auth.is_authenticated(request), HttpUnauthorized), True)
 
         # Correct user/api_key.
-        john_doe = User.objects.get(username='johndoe')
+        john_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'johndoe'})
         request.META['HTTP_AUTHORIZATION'] = 'ApiKey johndoe:%s' % john_doe.api_key.key
         self.assertEqual(auth.is_authenticated(request), True)
 
         # Capitalization shouldn't matter.
-        john_doe = User.objects.get(username='johndoe')
+        john_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'johndoe'})
         request.META['HTTP_AUTHORIZATION'] = 'aPiKeY johndoe:%s' % john_doe.api_key.key
         self.assertEqual(auth.is_authenticated(request), True)
 
     def test_check_active_true(self):
+        user_class = get_user_model()
         auth = ApiKeyAuthentication()
         request = HttpRequest()
 
-        bob_doe = User.objects.get(username='bobdoe')
+        bob_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'bobdoe'})
         create_api_key(User, instance=bob_doe, created=True)
         request.META['HTTP_AUTHORIZATION'] = 'ApiKey bobdoe:%s' % bob_doe.api_key.key
         self.assertFalse(auth.is_authenticated(request))
 
     def test_check_active_false(self):
+        user_class = get_user_model()
         auth = BasicAuthentication(require_active=False)
         request = HttpRequest()
 
-        bob_doe = User.objects.get(username='bobdoe')
+        bob_doe = user_class.objects.get(**{user_class.USERNAME_FIELD: 'bobdoe'})
         create_api_key(User, instance=bob_doe, created=True)
         request.META['HTTP_AUTHORIZATION'] = 'ApiKey bobdoe:%s' % bob_doe.api_key.key
         self.assertTrue(auth.is_authenticated(request))

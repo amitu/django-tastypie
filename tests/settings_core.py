@@ -24,3 +24,6 @@ LOGGING = {
     }
 }
 
+AUTH_APP = 'auth_app'
+AUTH_USER_MODEL = 'auth_app.User'
+INSTALLED_APPS.append(AUTH_APP)
