@@ -12,6 +12,7 @@ from django.utils.translation import ugettext as _
 from tastypie.http import HttpUnauthorized
 from tastypie.utils import get_user_model
 
+from myproject.utils import get_user_from_user_or_detail
 
 try:
     from hashlib import sha1
@@ -113,7 +114,7 @@ class BasicAuthentication(Authentication):
             return self._unauthorized()
 
         try:
-            (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split()
+            (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split(None, 1)
             if auth_type.lower() != 'basic':
                 return self._unauthorized()
             user_pass = base64.b64decode(data)
@@ -164,7 +165,9 @@ class ApiKeyAuthentication(Authentication):
         user_class = get_user_model()
 
         if request.META.get('HTTP_AUTHORIZATION') and request.META['HTTP_AUTHORIZATION'].lower().startswith('apikey '):
-            (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split()
+            (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split(
+                None, 1
+            )
 
             if auth_type.lower() != 'apikey':
                 raise ValueError("Incorrect authorization header.")
@@ -192,15 +195,13 @@ class ApiKeyAuthentication(Authentication):
         if not unique_field or not api_key:
             return self._unauthorized()
 
-        try:
-            user = user_class.objects.get(**{user_class.USERNAME_FIELD: unique_field})
-        except (user_class.DoesNotExist, user_class.MultipleObjectsReturned):
+        user = get_user_from_user_or_detail(unique_field)
+
+        if not user:
             return self._unauthorized()
 
-        if not self.check_active(user):
-            return False
-
         key_auth_check = self.get_key(user, api_key)
+
         if key_auth_check and not isinstance(key_auth_check, HttpUnauthorized):
             request.user = user
 
