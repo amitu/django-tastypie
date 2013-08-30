@@ -12,7 +12,6 @@ from django.utils.translation import ugettext as _
 from tastypie.http import HttpUnauthorized
 from tastypie.utils import get_user_model
 
-from myproject.utils import get_user_from_user_or_detail
 
 try:
     from hashlib import sha1
@@ -186,6 +185,9 @@ class ApiKeyAuthentication(Authentication):
         Should return either ``True`` if allowed, ``False`` if not or an
         ``HttpResponse`` if you need something custom.
         """
+
+        from myproject.utils import get_user_from_user_or_detail
+
         user_class = get_user_model()
         try:
             unique_field, api_key = self.extract_credentials(request)
