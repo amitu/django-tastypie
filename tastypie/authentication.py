@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import base64
 import hmac
 import time
@@ -12,6 +13,7 @@ from django.utils.translation import ugettext as _
 from tastypie.http import HttpUnauthorized
 from tastypie.utils import get_user_model
 
+from tastypie.compat import User, username_field
 
 try:
     from hashlib import sha1
@@ -116,7 +118,7 @@ class BasicAuthentication(Authentication):
             (auth_type, data) = request.META['HTTP_AUTHORIZATION'].split(None, 1)
             if auth_type.lower() != 'basic':
                 return self._unauthorized()
-            user_pass = base64.b64decode(data)
+            user_pass = base64.b64decode(data).decode('utf-8')
         except:
             return self._unauthorized()
 
@@ -185,6 +187,10 @@ class ApiKeyAuthentication(Authentication):
         Should return either ``True`` if allowed, ``False`` if not or an
         ``HttpResponse`` if you need something custom.
         """
+<<<<<<< HEAD
+=======
+        from tastypie.compat import User
+>>>>>>> master
 
         from myproject.utils import get_user_from_user_or_detail
 
@@ -197,7 +203,15 @@ class ApiKeyAuthentication(Authentication):
         if not unique_field or not api_key:
             return self._unauthorized()
 
+<<<<<<< HEAD
         user = get_user_from_user_or_detail(unique_field)
+=======
+        try:
+            lookup_kwargs = {username_field: username}
+            user = User.objects.get(**lookup_kwargs)
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            return self._unauthorized()
+>>>>>>> master
 
         if not user:
             return self._unauthorized()
@@ -284,7 +298,7 @@ class SessionAuthentication(Authentication):
 
         This implementation returns the user's username.
         """
-        return request.user.username
+        return getattr(request.user, username_field)
 
 
 class DigestAuthentication(Authentication):
@@ -315,8 +329,14 @@ class DigestAuthentication(Authentication):
     def _unauthorized(self):
         response = HttpUnauthorized()
         new_uuid = uuid.uuid4()
-        opaque = hmac.new(str(new_uuid), digestmod=sha1).hexdigest()
-        response['WWW-Authenticate'] = python_digest.build_digest_challenge(time.time(), getattr(settings, 'SECRET_KEY', ''), self.realm, opaque, False)
+        opaque = hmac.new(str(new_uuid).encode('utf-8'), digestmod=sha1).hexdigest()
+        response['WWW-Authenticate'] = python_digest.build_digest_challenge(
+            timestamp=time.time(),
+            secret=getattr(settings, 'SECRET_KEY', ''),
+            realm=self.realm,
+            opaque=opaque,
+            stale=False
+        )
         return response
 
     def is_authenticated(self, request, **kwargs):
@@ -364,10 +384,9 @@ class DigestAuthentication(Authentication):
         return True
 
     def get_user(self, username):
-        from django.contrib.auth.models import User
-
         try:
-            user = User.objects.get(username=username)
+            lookup_kwargs = {username_field: username}
+            user = User.objects.get(**lookup_kwargs)
         except (User.DoesNotExist, User.MultipleObjectsReturned):
             return False
 
@@ -434,7 +453,7 @@ class OAuthAuthentication(Authentication):
 
             try:
                 self.validate_token(request, consumer, token)
-            except oauth2.Error, e:
+            except oauth2.Error as e:
                 return oauth_provider.utils.send_oauth_error(e)
 
             if consumer and token:
