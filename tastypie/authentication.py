@@ -187,10 +187,6 @@ class ApiKeyAuthentication(Authentication):
         Should return either ``True`` if allowed, ``False`` if not or an
         ``HttpResponse`` if you need something custom.
         """
-<<<<<<< HEAD
-=======
-        from tastypie.compat import User
->>>>>>> master
 
         from myproject.utils import get_user_from_user_or_detail
 
@@ -203,15 +199,7 @@ class ApiKeyAuthentication(Authentication):
         if not unique_field or not api_key:
             return self._unauthorized()
 
-<<<<<<< HEAD
         user = get_user_from_user_or_detail(unique_field)
-=======
-        try:
-            lookup_kwargs = {username_field: username}
-            user = User.objects.get(**lookup_kwargs)
-        except (User.DoesNotExist, User.MultipleObjectsReturned):
-            return self._unauthorized()
->>>>>>> master
 
         if not user:
             return self._unauthorized()
