@@ -20,7 +20,7 @@ try:
         try:
             return timezone.localtime(timezone.now())
         except ValueError:
-            return timezone.localtime(timezone.make_aware(timezone.now(), timezone.get_default_timezone()))
+            return timezone.now()
 
 except ImportError:
     now = datetime.datetime.now
