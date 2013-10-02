@@ -17,7 +17,10 @@ try:
         return value
 
     def now():
-        return timezone.localtime(timezone.now())
+        try:
+            return timezone.localtime(timezone.now())
+        except ValueError:
+            return timezone.localtime(timezone.make_aware(timezone.now(), timezone.get_default_timezone()))
 
 except ImportError:
     now = datetime.datetime.now
